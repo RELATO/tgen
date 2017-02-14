@@ -98,7 +98,7 @@ Your account balance is {{.Balance | printf "%.2f"}}
 Send emails:
 
 ```bash
-./tgen -tg templates/email*.t -tn bal_email1.t -d balances.csv -out 'admin@example.com Your balance'
+./tgen -tg templates/email*.t -tn email1.t -d balances.csv -out 'admin@example.com Your balance'
 ```
 
 The email function will add a `From:`, `To:` and `Subject:` line at the start of the body.
