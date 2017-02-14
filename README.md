@@ -92,7 +92,7 @@ template `templates/email1.t`
 
 ```
 Hi {{.Name}},
-Your account balance is {{.Balance | printf %.2f}}
+Your account balance is {{.Balance | printf "%.2f"}}
 ```
 
 Send emails:
