@@ -24,12 +24,23 @@ The path of the data file is given by:
 
 `-d` followed by the path
 
-The top line is expected to be the column headers and each value
+The top line is expected to be the column headers and each value is a key that can be used in the template to reference the column value, e.g.
 
-Currently only simple comma separated values are supported. Not even CSV format but a variety of formats
+```
+ID,Name
+123,John Smith
+456,Jane Jones
+```
+template:
+
+```
+User {{.ID}} name is {{.Name}}
+```
+
+Currently only simple comma separated values are supported. A variety of formats
 will be allowed later:
 
-- comma separated values
+- proper comma separated values, using _Go_ csv parser
 - tab separated valus
 - key value pairs: each line `key=value` with empty line between records
 - XML markup: <key1>value1</key1>
@@ -67,9 +78,35 @@ The `SMTP` environment variable has to be set. Port must be specified or use `:s
 The data input must have a `_rcpt` value for each record which contains the recipient address. In fact it can contain multiple
 addresses separated by a comma. There is currently no `_cc` or `_bcc` option.
 
+Example:
+
+data file `balances.csv`
+
+```
+_rcpt,Name,Balance
+john@example.com,John Smith,939.88
+jane@example.org,Jane Jones,1090.7
+```
+
+template `templates/email1.t`
+
+```
+Hi {{.Name}},
+Your account balance is {{.Balance | printf %.2f}}
+```
+
+Send emails:
+
+```bash
+./tgen -tg templates/email*.t -tn bal_email1.t -d balances.csv -out 'admin@example.com Your balance'
+```
+
+The email function will add a `From:`, `To:` and `Subject:` line at the start of the body.
+
+
 ### ODBC
 
-In the future we will be able to output to a database and fill a table with records
+In the future we will be able to output to a database and fill a table with records, maybe.
 
 
 
