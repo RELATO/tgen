@@ -1,0 +1,6 @@
+({{._line}}) Language: {{.Language}}
+  One is {{.One}}
+  Two is {{.Two}}
+  Three is {{.Three}}
+{{template "debug.txt" .}}
+-----

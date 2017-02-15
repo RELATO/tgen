@@ -12,10 +12,11 @@ import (
 )
 
 func main() {
-	var data, tmpl, action, apply string
+	var data, tglob, tname, parse, action string
 	flag.StringVar(&data, "d", "", "Data file")
-	flag.StringVar(&tmpl, "tg", "", "Template file glob")
-	flag.StringVar(&apply, "tn", "", "Name of the template to apply.")
+	flag.StringVar(&parse, "df", "csv", "Data format") // todo: tsv, kv, xml, sub
+	flag.StringVar(&tglob, "tg", "", "Template file glob")
+	flag.StringVar(&tname, "tn", "", "Name of the template to apply.")
 	flag.StringVar(&action, "out", "", `Output action; for email: "from@example.com Subject goes here", "SMTP" env var defines addr+port, "_rcpt" in data file is To-address `)
 	flag.Parse()
 
@@ -23,10 +24,14 @@ func main() {
 		"lower": strings.ToLower,
 		"upper": strings.ToUpper,
 	}
-	tt, err := template.New("").Funcs(funcs).ParseGlob(tmpl)
+	tt, err := template.New("").Funcs(funcs).ParseGlob(tglob)
 	if err != nil {
 		panic(err)
 	}
+	if all := tt.Templates(); len(all) == 1 && tname == "" {
+		tname = all[0].ParseName
+	}
+
 	dd, err := os.Open(data)
 	if err != nil {
 		panic(err)
@@ -45,7 +50,7 @@ func main() {
 	}
 
 	var n int
-	var hdr []string
+	var keys []string
 	m := make(map[string]string)
 	scanner := bufio.NewScanner(dd)
 	for scanner.Scan() {
@@ -53,23 +58,23 @@ func main() {
 		fields := strings.Split(row, ",")
 		if n == 0 {
 			n = 1
-			hdr = make([]string, len(fields))
+			keys = make([]string, len(fields))
 			for i, value := range fields {
-				hdr[i] = value
+				keys[i] = value
 			}
 			continue
 		}
 		for i, value := range fields {
-			m[hdr[i]] = value
+			m[keys[i]] = value
 		}
 		m["_line"] = fmt.Sprintf("%d", n) // line number, from 1
 
 		if action == "" {
-			tt.ExecuteTemplate(os.Stdout, apply, m)
+			tt.ExecuteTemplate(os.Stdout, tname, m)
 		} else if strings.Contains(action, "@") {
 			to := strings.Split(m["_rcpt"], ",")
 			var buf bytes.Buffer
-			tt.ExecuteTemplate(&buf, apply, m)
+			tt.ExecuteTemplate(&buf, tname, m)
 			email(addr, from, to, subject, buf.String())
 		}
 		n++
@@ -82,3 +87,5 @@ func email(addr, from string, to []string, subject, msg string) error {
 	// return nil
 	return smtp.SendMail(addr, nil, from, to, []byte(body))
 }
+
+
