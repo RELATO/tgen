@@ -26,12 +26,13 @@ The path of the data file is given by:
 
 The top line is expected to be the column headers and each value
 
-Currently only simple comma separated values are supported. Not even CSV format but a variety of formats
+Currently only csv, tsv and custom separators are supported. A variety of formats
 will be allowed later:
 
 - comma separated values
 - tab separated valus
 - key value pairs: each line `key=value` with empty line between records
+- fixed column widths
 - XML markup: <key1>value1</key1>
 
 ### ODBC
@@ -40,7 +41,7 @@ The plan is to use ODBC as an alternative data source. To do.
 
 ### Stdin
 
-Will also be supported to pipe data into the program.
+Input is read from Stdin if `-d` is omitted.
 
 ## Output methods
 
@@ -66,6 +67,8 @@ The `SMTP` environment variable has to be set. Port must be specified or use `:s
 
 The data input must have a `_rcpt` value for each record which contains the recipient address. In fact it can contain multiple
 addresses separated by a comma. There is currently no `_cc` or `_bcc` option.
+
+Attachments are not supported.
 
 ### ODBC
 

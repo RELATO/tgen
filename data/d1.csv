@@ -1,4 +1,5 @@
-Language,One,Two,Three
-Dutch,een,twee,drie
-French,un,deux,trois
-Pinyin,yi1,er2,san1
+Language,One,Two,Three,_rcpt
+Dutch,een,twee,drie,jan@example.net
+French,un,deux,trois,jean@example.net
+Pinyin,yi1,er2,san1,zhang@exampl.net
+"Test commas and ""double"" quotes","1, one","2, two","3, three","pete@example.net,lou@example.net"

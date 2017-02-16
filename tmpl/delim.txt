@@ -1,0 +1,3 @@
+Different delimiters
+{{.One}} = <.One> = `.One`
+{{.Two}} = <.Two> = `.Two` etc. 

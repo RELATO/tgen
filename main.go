@@ -1,91 +1,88 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
-	"net/smtp"
+	"io"
 	"os"
 	"strings"
 	"text/template"
 )
 
+type record map[string]string
+
 func main() {
-	var data, tglob, tname, parse, action string
+	var data, tglob, tname, df, action, delim, sep string
 	flag.StringVar(&data, "d", "", "Data file")
-	flag.StringVar(&parse, "df", "csv", "Data format") // todo: tsv, kv, xml, sub
+	flag.StringVar(&df, "df", "csv", "Data format") // todo: tsv, kv, xml, sub
 	flag.StringVar(&tglob, "tg", "", "Template file glob")
 	flag.StringVar(&tname, "tn", "", "Name of the template to apply.")
 	flag.StringVar(&action, "out", "", `Output action; for email: "from@example.com Subject goes here", "SMTP" env var defines addr+port, "_rcpt" in data file is To-address `)
+	flag.StringVar(&delim, "delim", "", `Left and right template place holder delimiters, space separated, default "{{ }}"`)
+	flag.StringVar(&sep, "sep", "", `Column separator in -df csv (default ',') or key-value separator in -df kv (default '=')`)
 	flag.Parse()
 
+	// template functions
 	var funcs = template.FuncMap{
 		"lower": strings.ToLower,
 		"upper": strings.ToUpper,
 	}
-	tt, err := template.New("").Funcs(funcs).ParseGlob(tglob)
+	// set up root template
+	tt := template.New("")
+	if delim != "" {
+		lr := strings.Split(delim, " ")
+		tt = tt.Delims(lr[0], lr[1])
+	}
+	tt, err := tt.Funcs(funcs).ParseGlob(tglob)
 	if err != nil {
 		panic(err)
 	}
+	tt.Option("missingkey=zero") // print empty string if not found
+
+	// set the main template
 	if all := tt.Templates(); len(all) == 1 && tname == "" {
-		tname = all[0].ParseName
+		tname = all[0].ParseName // use the template if it's the only one
+	}
+	tmpl := tt.Lookup(tname)
+	if tmpl == nil {
+		fmt.Printf("Template '%s' not found\r\n", tname)
+		os.Exit(1)
 	}
 
-	dd, err := os.Open(data)
-	if err != nil {
-		panic(err)
-	}
-	defer dd.Close()
+	// set up the input
+	var in io.Reader
 
-	actionEmail := strings.Contains(action, "@")
-	var addr, from, subject string
-	if actionEmail {
-		addr = os.Getenv("SMTP")
-		parts := strings.SplitN(action, " ", 2) // e.g. -out "noreply@example.com Important information"
-		from = parts[0]
-		if len(parts) > 1 {
-			subject = parts[1]
+	if data == "" {
+		in = os.Stdin // read from stdin, whatever is piped through
+	} else {
+		// data file path is given, use that instead of stdin
+		file, err := os.Open(data)
+		if err != nil {
+			panic(err)
 		}
+		defer file.Close()
+		in = file
 	}
 
-	var n int
-	var keys []string
-	m := make(map[string]string)
-	scanner := bufio.NewScanner(dd)
-	for scanner.Scan() {
-		row := scanner.Text()
-		fields := strings.Split(row, ",")
-		if n == 0 {
-			n = 1
-			keys = make([]string, len(fields))
-			for i, value := range fields {
-				keys[i] = value
-			}
-			continue
-		}
-		for i, value := range fields {
-			m[keys[i]] = value
-		}
-		m["_line"] = fmt.Sprintf("%d", n) // line number, from 1
+	rec := make(record)
+	handleRec := getAction(action, rec) // how to process data, can fill 'rec' with options
 
-		if action == "" {
-			tt.ExecuteTemplate(os.Stdout, tname, m)
-		} else if strings.Contains(action, "@") {
-			to := strings.Split(m["_rcpt"], ",")
-			var buf bytes.Buffer
-			tt.ExecuteTemplate(&buf, tname, m)
-			email(addr, from, to, subject, buf.String())
-		}
-		n++
+	// run parser and handler each in their own go-routine
+	// they pass data through channel c
+	c := make(chan record)
+	done := make(chan struct{})
+	opt := make(record)
+	if sep != "" {
+		opt = record{"_sep": sep}
 	}
+	switch df {
+	case "csv":
+		go parseCSV(in, c, opt)
+	case "tsv":
+		go parseCSV(in, c, record{"_sep": "\t"})
+	// case "kv":
+	// 	go parseKeyValues(in, c, opt)
+	}
+	go handleRec(tmpl, rec, c, done)
+	<-done // wait till handleRec is done
 }
-
-func email(addr, from string, to []string, subject, msg string) error {
-	body := "From: " + from + "\r\nTo: " + strings.Join(to, ",") + "\r\nSubject: " + subject + "\r\n\r\n" + msg
-	// fmt.Println(addr, from, to, body)
-	// return nil
-	return smtp.SendMail(addr, nil, from, to, []byte(body))
-}
-
-
